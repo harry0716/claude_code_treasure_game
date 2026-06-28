@@ -14,10 +14,41 @@ cd server && npm install   # Install backend dependencies
 npm run dev:server         # Start Express API server at http://localhost:3001
 
 # Build
-npm run build        # Build frontend to ./build/
+npm run build        # Build frontend to ./build/ (Vercel version)
+npm run build:gh     # Build frontend to ./build/ (GitHub Pages version, VITE_GH_PAGES=true)
+npm run deploy:gh    # Build + push to gh-pages branch (GitHub Pages deployment)
 ```
 
 No test runner is configured in this project.
+
+## Custom Commands
+
+在 Claude Code 對話框輸入 `/指令名稱` 呼叫，定義檔位於 `.claude/commands/`。  
+完整說明請見 `.claude/commands/README.md`。
+
+| 指令 | 用途 | 目標平台 |
+|------|------|---------|
+| `/deploy_vercel` | 部署完整全端應用（Express + SQLite） | Vercel |
+| `/deploy_github` | 初始化 Git 並推送程式碼到 GitHub | GitHub repository |
+| `/deploy_github_page` | 部署純前端版本（localStorage 取代後端） | GitHub Pages |
+
+**已部署網址：**
+- Vercel（全端）：`https://claudecodetreasuregame-initial-sepia.vercel.app`
+- GitHub Pages（純前端）：`https://harry0716.github.io/claude_code_treasure_game/`
+- GitHub repository：`https://github.com/harry0716/claude_code_treasure_game`
+
+## Deployment Modes
+
+`App.tsx` 透過 `VITE_GH_PAGES` 環境變數切換運作模式：
+
+- **`VITE_GH_PAGES` 未設定（預設）**：所有 API 呼叫打向 `/api/...`（Vercel Serverless 或本機 Express）
+- **`VITE_GH_PAGES=true`**：改用 `src/storage.ts` 的 localStorage 操作，不需要任何後端
+
+相關檔案：
+- `src/storage.ts` — localStorage 版的帳號/遊戲 CRUD
+- `.env.gh-pages` — 設定 `VITE_GH_PAGES=true`（給 `build:gh` 使用）
+- `api/index.js` — Vercel Serverless Function 入口
+- `vercel.json` — Vercel 建置設定與 API 路由重寫
 
 ## Architecture
 
