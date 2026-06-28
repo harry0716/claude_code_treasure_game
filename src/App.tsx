@@ -7,6 +7,12 @@ import treasureChest from './assets/treasure_opened.png';
 import skeletonChest from './assets/treasure_opened_skeleton.png';
 import chestOpenSound from './audios/chest_open.mp3';
 import evilLaughSound from './audios/chest_open_with_evil_laugh.mp3';
+import {
+  localRegister, localLogin, localCreateSession,
+  localLogClick, localEndSession, localGetHistory,
+} from './storage';
+
+const IS_GH_PAGES = import.meta.env.VITE_GH_PAGES === 'true';
 
 interface Box {
   id: number;
@@ -53,21 +59,30 @@ export default function App() {
     setAuthError('');
     setAuthLoading(true);
     try {
-      const res = await fetch(`/api/auth/${authMode}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: authUsername, password: authPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setAuthError(data.error || '操作失敗');
-        return;
+      if (IS_GH_PAGES) {
+        const result = authMode === 'register'
+          ? localRegister(authUsername, authPassword)
+          : localLogin(authUsername, authPassword);
+        if ('error' in result) { setAuthError(result.error); return; }
+        localStorage.setItem('token', result.token);
+        localStorage.setItem('username', result.username);
+        setToken(result.token);
+        setUsername(result.username);
+        setView('game');
+      } else {
+        const res = await fetch(`/api/auth/${authMode}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: authUsername, password: authPassword }),
+        });
+        const data = await res.json();
+        if (!res.ok) { setAuthError(data.error || '操作失敗'); return; }
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('username', data.username);
+        setToken(data.token);
+        setUsername(data.username);
+        setView('game');
       }
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('username', data.username);
-      setToken(data.token);
-      setUsername(data.username);
-      setView('game');
     } catch {
       setAuthError('無法連線到伺服器');
     } finally {
@@ -87,6 +102,11 @@ export default function App() {
 
   const startNewSession = async () => {
     try {
+      if (IS_GH_PAGES) {
+        const id = localCreateSession(username);
+        setSessionId(id);
+        return id;
+      }
       const res = await fetch('/api/games', {
         method: 'POST',
         headers: apiHeaders(),
@@ -150,35 +170,47 @@ export default function App() {
     setScore(newScore);
 
     if (sessionId) {
-      fetch(`/api/games/${sessionId}/logs`, {
-        method: 'POST',
-        headers: apiHeaders(),
-        body: JSON.stringify({
-          boxId,
-          hasTreasure: box.hasTreasure,
-          scoreChange,
-          scoreAfter: newScore,
-        }),
-      }).catch(() => {});
+      if (IS_GH_PAGES) {
+        localLogClick(sessionId);
+      } else {
+        fetch(`/api/games/${sessionId}/logs`, {
+          method: 'POST',
+          headers: apiHeaders(),
+          body: JSON.stringify({
+            boxId,
+            hasTreasure: box.hasTreasure,
+            scoreChange,
+            scoreAfter: newScore,
+          }),
+        }).catch(() => {});
+      }
     }
   };
 
   useEffect(() => {
     if (!gameEnded || !sessionId) return;
     const result = score > 0 ? 'win' : score < 0 ? 'lose' : 'tie';
-    fetch(`/api/games/${sessionId}`, {
-      method: 'PUT',
-      headers: apiHeaders(),
-      body: JSON.stringify({ finalScore: score, result }),
-    }).catch(() => {});
+    if (IS_GH_PAGES) {
+      localEndSession(sessionId, score, result);
+    } else {
+      fetch(`/api/games/${sessionId}`, {
+        method: 'PUT',
+        headers: apiHeaders(),
+        body: JSON.stringify({ finalScore: score, result }),
+      }).catch(() => {});
+    }
   }, [gameEnded]);
 
   const loadHistory = async () => {
     setHistoryLoading(true);
     try {
-      const res = await fetch('/api/games', { headers: apiHeaders() });
-      const data = await res.json();
-      setHistory(data);
+      if (IS_GH_PAGES) {
+        setHistory(localGetHistory(username));
+      } else {
+        const res = await fetch('/api/games', { headers: apiHeaders() });
+        const data = await res.json();
+        setHistory(data);
+      }
     } catch {
       setHistory([]);
     } finally {

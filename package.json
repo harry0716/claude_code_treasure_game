@@ -62,6 +62,8 @@
       "scripts": {
             "dev": "vite",
             "dev:server": "node --no-warnings=ExperimentalWarning server/index.js",
-            "build": "vite build"
+            "build": "vite build",
+            "build:gh": "vite build --mode gh-pages",
+            "deploy:gh": "npm run build:gh && npx gh-pages -d build"
       }
 }
